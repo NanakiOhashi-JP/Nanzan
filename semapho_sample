@@ -1,0 +1,78 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+#define N 5
+
+pthread_barrier_t barrier;
+sem_t waiter[2];
+
+void get_first(int x) {
+  sem_wait(&waiter[0]);
+  printf("[worker %d] got a first stick\n", x);
+}
+
+void get_second(int x) {
+  sem_wait(&waiter[1]);
+  printf("[worker %d] got a second stick\n", x);
+}
+
+void get_sticks(int x) {
+  get_first(x); sleep(1); get_second(x);
+}
+
+void put_first(int x) {
+  printf("[worker %d] put the first stick\n",x);
+  sem_post(&waiter[0]);
+}
+
+void put_second(int x) {
+  printf("[worker %d] put the second stick\n", x);
+  sem_post(&waiter[1]);
+}
+
+void put_sticks(int x) {
+  put_first(x); sleep(1); put_second(x);
+}
+
+void eat(int x) {
+  printf("[worker %d] eating\n", x);
+  sleep(2);
+}
+
+void *worker(void *p) {
+  int x = *(int *) p;
+  pthread_barrier_wait(&barrier);
+  get_sticks(x); eat(x); put_sticks(x);
+  return NULL;
+}
+
+int main(void) {
+  pthread_t handle[N];
+  int x[N];
+  
+  sem_init(&waiter[0], 0, N - N / 2);
+  sem_init(&waiter[1], 0, N / 2);
+  pthread_barrier_init(&barrier, NULL, N);
+  
+  for (int i = 0; i < N; i++) {
+    x[i] = i;
+    pthread_create(&handle[i], NULL, worker, &x[i]);
+  }
+
+  for (int i = 0; i < N; i++) {
+    pthread_join(handle[i], NULL);
+  }
+  
+  printf("finished\n");
+  sem_destroy(&waiter[0]);
+  sem_destroy(&waiter[1]);
+  pthread_barrier_destroy(&barrier);
+
+  return 0;
+}
+
+
+
